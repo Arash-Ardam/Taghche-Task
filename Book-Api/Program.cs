@@ -19,6 +19,7 @@ namespace Book_Api
             builder.Services.AddHttpClient("Book-Client", httpclient => httpclient.BaseAddress = new Uri(builder.Configuration.GetSection("Book-Api:api-address").Value));
             builder.Services.Configure<CacheConfig>(builder.Configuration.GetSection(nameof(CacheConfig)));
             builder.Services.AddSingleton<IConnectionMultiplexer>(ConnectionMultiplexer.Connect("localhost:6000"));
+            builder.Services.AddDistributedMemoryCache();
             builder.Services.AddScoped<BookService>();
             builder.Services.AddScoped<BookController>();
             builder.Services.AddEndpointsApiExplorer();
@@ -36,10 +37,14 @@ namespace Book_Api
             app.UseHttpsRedirection();
 
             app.UseAuthorization();
-
+            
 
             app.MapControllers();
+
+            app.UseMiddleware<StreamBuilderMiddleware>();
+            app.UseMiddleware<InMemoryCacheMiddleware>();
             app.UseMiddleware<RedisMiddleware>();
+
             app.Run();
         }
     }

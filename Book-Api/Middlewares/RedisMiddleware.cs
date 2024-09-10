@@ -45,26 +45,19 @@ namespace Book_Api.Middlewares
                 return;
             }
 
-            var memoryStream = new MemoryStream();
-            using (memoryStream)
-            {
-                context.Response.Body = memoryStream;
-
                 await _next(context);
 
-                memoryStream.Seek(0, SeekOrigin.Begin);
-                var streamReader = new StreamReader(memoryStream);
+                context.Response.Body.Seek(0, SeekOrigin.Begin);
+                var streamReader = new StreamReader(context.Response.Body);
                 var contextResult = await streamReader.ReadToEndAsync();
                 if (contextResult != null)
                 {
-                    var expirationTime = new TimeSpan(_options.Value.redis.expirationTime);
+                    var expirationTime = TimeSpan.FromSeconds(_options.Value.redis.expirationTime);
                     var setTask = _redis.StringSetAsync(key, new RedisValue(contextResult));
                     var expireTask = _redis.KeyExpireAsync(key, expirationTime);
 
                     await Task.WhenAll(setTask, expireTask);
                 }
-            }
-
         }
 
     }
