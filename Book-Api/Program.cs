@@ -24,7 +24,6 @@ namespace Book_Api
             builder.Services.AddHostedService<RabbitBackgroundService.RabbitBackgroundService>();
             builder.Services.AddDistributedMemoryCache();
             builder.Services.AddSingleton<ConnectionFactory>();
-            builder.Services.AddSingleton<cacheKeyGenerator>();
             builder.Services.AddScoped<BookService>();
             builder.Services.AddScoped<BookController>();
             builder.Services.AddEndpointsApiExplorer();

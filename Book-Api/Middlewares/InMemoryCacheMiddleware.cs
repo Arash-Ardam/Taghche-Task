@@ -10,14 +10,12 @@ namespace Book_Api.Middlewares
 {
     public class InMemoryCacheMiddleware
     {
-        private readonly cacheKeyGenerator _keyGenerator;
         private readonly RequestDelegate _next;
         private readonly IOptions<CacheConfig> _options;
         private readonly IDistributedCache _memCache;
 
-        public InMemoryCacheMiddleware(RequestDelegate next, IDistributedCache memoryCache, IOptions<CacheConfig> options,cacheKeyGenerator keyGenerator)
+        public InMemoryCacheMiddleware(RequestDelegate next, IDistributedCache memoryCache, IOptions<CacheConfig> options)
         {
-            _keyGenerator = keyGenerator;
             _next = next;
             _options = options;
             _memCache = memoryCache;
@@ -26,7 +24,7 @@ namespace Book_Api.Middlewares
 
         public async Task InvokeAsync(HttpContext context)
         {
-            var key = _keyGenerator.GenerateKeyFromHttpContext(context);
+            var key = cacheKeyGenerator.GenerateKeyFromHttpContext(context);
 
             var cacheContent = _memCache.Get(key);
 

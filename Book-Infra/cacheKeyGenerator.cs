@@ -7,10 +7,10 @@ using System.Threading.Tasks;
 
 namespace Book_Infra
 {
-    public class cacheKeyGenerator
+    public static class cacheKeyGenerator
     {
 
-        public string GenerateKeyFromHttpContext(HttpContext httpContext)
+        public static string GenerateKeyFromHttpContext(HttpContext httpContext)
         {
             string key = string.Empty;
 
@@ -22,6 +22,12 @@ namespace Book_Infra
                     key = $"BookId:{path.Last()}";
                 }
             }
+            return key ;
+        }
+
+        public static string GenerateKeyFromId(int id)
+        {
+            string key = $"BookId:{id}";
             return key ;
         }
 

@@ -5,6 +5,8 @@ using System.Text;
 using Microsoft.Extensions.Caching.Memory;
 using Microsoft.Extensions.Caching.Distributed;
 using StackExchange.Redis;
+using Newtonsoft.Json;
+using Book_Infra;
 
 namespace Book_Api.RabbitBackgroundService
 {
@@ -41,19 +43,20 @@ namespace Book_Api.RabbitBackgroundService
             consumer.Received += (sender, args) =>
             {
                 var body = args.Body.ToArray();
-                string message = Encoding.UTF8.GetString(body);
-                result = message;
 
-                if (message.Contains("modified"))
+                string messageString = Encoding.UTF8.GetString(body);
+
+                BookMessage message = JsonConvert.DeserializeObject<BookMessage>(messageString);
+
+                if (message != null)
                 {
-                    object t;
-                    var bookId = Encoding.UTF8.GetString((byte[])args.BasicProperties.Headers["BookId"]);
-                    var key = $"BookId:{bookId}";
+                    var key = cacheKeyGenerator.GenerateKeyFromId(message.BookId);
 
                     _memCache.Remove(key);
                     _redis.KeyDelete(key);
-                }
 
+                    Console.WriteLine($"consumer message : {message.Message}");
+                }
                 cannel.BasicAck(args.DeliveryTag, false);
 
             };
@@ -63,5 +66,11 @@ namespace Book_Api.RabbitBackgroundService
 
         }
 
+    }
+
+    internal class BookMessage
+    {
+        public int BookId { get; set; }
+        public string Message { get; set; } = string.Empty;
     }
 }
