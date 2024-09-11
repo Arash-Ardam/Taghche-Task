@@ -1,4 +1,5 @@
-﻿using Microsoft.Extensions.Options;
+﻿using Book_Infra;
+using Microsoft.Extensions.Options;
 using StackExchange.Redis;
 using System.Diagnostics;
 using System.Globalization;
@@ -9,12 +10,14 @@ namespace Book_Api.Middlewares
 {
     public class RedisMiddleware
     {
+        private readonly cacheKeyGenerator _keyGenerator;
         private readonly IOptions<CacheConfig> _options;
         private readonly RequestDelegate _next;
         private readonly IDatabase _redis;
 
-        public RedisMiddleware(RequestDelegate next, IConnectionMultiplexer muxer,IOptions<CacheConfig> options)
+        public RedisMiddleware(RequestDelegate next, IConnectionMultiplexer muxer,IOptions<CacheConfig> options,cacheKeyGenerator keyGenerator)
         {
+            _keyGenerator = keyGenerator;
             _options = options;
             _next = next;
             _redis = muxer.GetDatabase();
@@ -27,7 +30,7 @@ namespace Book_Api.Middlewares
                 await _next(context);
             }
 
-            var key = new RedisKey(context.Request.Path);
+            var key = new RedisKey(_keyGenerator.GenerateKeyFromHttpContext(context));
             var result = _redis.StringGetAsync(key);
             
             if (result.Result.HasValue) 

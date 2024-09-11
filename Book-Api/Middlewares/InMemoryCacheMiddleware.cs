@@ -1,6 +1,8 @@
-﻿using Microsoft.Extensions.Caching.Distributed;
+﻿using Book_Infra;
+using Microsoft.Extensions.Caching.Distributed;
 using Microsoft.Extensions.Caching.Memory;
 using Microsoft.Extensions.Options;
+using Newtonsoft.Json;
 using StackExchange.Redis;
 using System.Text;
 
@@ -8,12 +10,14 @@ namespace Book_Api.Middlewares
 {
     public class InMemoryCacheMiddleware
     {
+        private readonly cacheKeyGenerator _keyGenerator;
         private readonly RequestDelegate _next;
         private readonly IOptions<CacheConfig> _options;
         private readonly IDistributedCache _memCache;
 
-        public InMemoryCacheMiddleware(RequestDelegate next, IDistributedCache memoryCache, IOptions<CacheConfig> options)
+        public InMemoryCacheMiddleware(RequestDelegate next, IDistributedCache memoryCache, IOptions<CacheConfig> options,cacheKeyGenerator keyGenerator)
         {
+            _keyGenerator = keyGenerator;
             _next = next;
             _options = options;
             _memCache = memoryCache;
@@ -22,18 +26,28 @@ namespace Book_Api.Middlewares
 
         public async Task InvokeAsync(HttpContext context)
         {
-            var key = context.Request.Path.ToString();
+            var key = _keyGenerator.GenerateKeyFromHttpContext(context);
 
             var cacheContent = _memCache.Get(key);
 
             if (cacheContent != null)
             {
+                
 
                 context.Response.ContentType = "application/json";
 
                 var result = Encoding.UTF8.GetString(cacheContent);
 
-                await context.Response.WriteAsync(result);
+                var exrtact = JsonConvert.DeserializeObject<MemoryCacheObject>(result);
+
+                context.Response.GetTypedHeaders().CacheControl = new Microsoft.Net.Http.Headers.CacheControlHeaderValue()
+                {
+                    Public = true,
+                    MaxAge = DateTimeOffset.UtcNow - exrtact.dateModified,
+                    
+                };
+
+                await context.Response.WriteAsync(exrtact.value);
                 return;
             }
 
@@ -45,7 +59,15 @@ namespace Book_Api.Middlewares
 
                 if (contextResult != null)
                 {
-                    await _memCache.SetAsync(key, Encoding.UTF8.GetBytes(contextResult),
+                    MemoryCacheObject entry = new MemoryCacheObject()
+                    {
+                        value = contextResult,
+                        dateModified = DateTime.UtcNow
+                    };
+                    
+                    var jsonSerializedEntry =JsonConvert.SerializeObject(entry);
+                    
+                    await _memCache.SetAsync(key, Encoding.UTF8.GetBytes(jsonSerializedEntry),
                         options: new DistributedCacheEntryOptions()
                         {
                             AbsoluteExpirationRelativeToNow = TimeSpan.FromSeconds(_options.Value.inMemoryCache.expirationTime)
@@ -55,8 +77,9 @@ namespace Book_Api.Middlewares
 
     }
 
-    //internal class MemoryCacheObject
-    //{
-    //    public
-    //}
+    internal class MemoryCacheObject
+    {
+        public string value { get; set; }
+        public DateTimeOffset dateModified { get; set; }
+    }
 }
