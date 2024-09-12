@@ -3,6 +3,7 @@ using Book_Api.Controllers;
 using Book_Api.Middlewares;
 using Book_Application;
 using Book_Infra;
+using Polly;
 using RabbitMQ.Client;
 using StackExchange.Redis;
 
@@ -20,12 +21,19 @@ namespace Book_Api
 
             builder.Services.AddHttpClient("Book-Client", httpclient => httpclient.BaseAddress = new Uri(builder.Configuration.GetSection("Book-Api:api-address").Value));
             builder.Services.Configure<CacheConfig>(builder.Configuration.GetSection(nameof(CacheConfig)));
-            builder.Services.AddSingleton<IConnectionMultiplexer>(ConnectionMultiplexer.Connect("localhost:6000"));
-            builder.Services.AddHostedService<RabbitBackgroundService.RabbitBackgroundService>();
+            Policy.Handle<RedisCommandException>()
+                .WaitAndRetry(5, x => TimeSpan.FromSeconds(15))
+                .Execute(() =>
+                {
+                    builder.Services.AddSingleton<IConnectionMultiplexer>(ConnectionMultiplexer.Connect("localhost:6379,abortConnect=false"));
+                }
+                );
             builder.Services.AddDistributedMemoryCache();
             builder.Services.AddSingleton<ConnectionFactory>();
             builder.Services.AddScoped<BookService>();
             builder.Services.AddScoped<BookController>();
+            builder.Services.AddHostedService<RabbitBackgroundService.RabbitBackgroundService>();
+
             builder.Services.AddEndpointsApiExplorer();
             builder.Services.AddSwaggerGen();
 
