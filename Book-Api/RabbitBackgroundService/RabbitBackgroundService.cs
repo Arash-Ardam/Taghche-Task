@@ -29,7 +29,7 @@ namespace Book_Api.RabbitBackgroundService
         protected override Task ExecuteAsync(CancellationToken stoppingToken)
         {
             string result = string.Empty;
-            _connFactory.Uri = new Uri("amqp://guest:guest@localhost:5672/");
+            _connFactory.Uri = new Uri("amqp://guest:guest@localhost:5672");
             _connFactory.ClientProvidedName = "Taghche-Rabbit-RecieverClient";
             _connFactory.AutomaticRecoveryEnabled = true;
 

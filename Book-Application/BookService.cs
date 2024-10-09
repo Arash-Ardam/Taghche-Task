@@ -1,19 +1,29 @@
 ﻿using Book_Infra;
+using Microsoft.Extensions.Caching.Distributed;
 using Microsoft.Extensions.Configuration;
+using Microsoft.Extensions.Options;
 using Newtonsoft.Json;
+using StackExchange.Redis;
 using System.Net.Http.Json;
+using System.Text;
 
 namespace Book_Application
 {
     public class BookService
     {
+        private readonly IOptions<CacheConfig> _options;
         private readonly IHttpClientFactory _factory;
         private readonly HttpClient _httpclient;
+        private readonly IDistributedCache _memCache;
+        private readonly IDatabase _redisCache;
 
-        public BookService(IHttpClientFactory httpClientFactory)
+        public BookService(IHttpClientFactory httpClientFactory, IDistributedCache memCache, IConnectionMultiplexer muxer, IOptions<CacheConfig> options)
         {
+            _options = options;
             _factory = httpClientFactory;
             _httpclient = _factory.CreateClient("Book-Client");
+            _memCache = memCache;
+            _redisCache = muxer.GetDatabase();
             
         }
 
@@ -23,16 +33,28 @@ namespace Book_Application
         {
             try
             {
-                string route = $"{_httpclient.BaseAddress}/{id}";
+                var cacheData = GetBookFromCache(id);
 
-                var response = await _httpclient.GetAsync(route);
+                if (cacheData == null)
+                {
+                    string route = $"{_httpclient.BaseAddress}/{id}";
 
-                //var content = await response.Content.ReadAsStringAsync();
-                var content = await response.Content.ReadFromJsonAsync<BookDto>();
+                    var response = await _httpclient.GetAsync(route);
 
+                    //var content = await response.Content.ReadAsStringAsync();
+                    var content = await response.Content.ReadFromJsonAsync<BookDto>();
 
+                    string key = cacheKeyGenerator.GenerateKeyFromId(id);
 
-                return content;
+                    await WriteDataToMemCache(key, await response.Content.ReadAsStringAsync());
+
+                    await WriteDatatoRedisCache(key, await response.Content.ReadAsStringAsync());
+
+                    return content;
+                }
+
+                return cacheData;
+               
             }
             catch (Exception)
             {
@@ -41,10 +63,51 @@ namespace Book_Application
             }
         }
 
+        private BookDto? GetBookFromCache(short id)
+        {
+            var key = cacheKeyGenerator.GenerateKeyFromId(id);
+
+            var memCacheData = _memCache.Get(key);
+            if (memCacheData != null)
+            {
+                var result = JsonConvert.DeserializeObject<BookDto>(Encoding.UTF8.GetString(memCacheData));
+
+                return result;
+
+            }
+
+            var redisCacheData = _redisCache.StringGetAsync(new RedisKey(key));
+            if (redisCacheData.Result.HasValue)
+            {
+                var result = JsonConvert.DeserializeObject<BookDto>(Encoding.UTF8.GetString(redisCacheData.Result));
+
+                WriteDataToMemCache(key, redisCacheData.Result);
+
+                return result;
+            }
+
+            return null;
+        }
 
 
+        private async Task WriteDatatoRedisCache(string key , string data)
+        {
+            var setTask = _redisCache.StringSetAsync(key, new RedisValue(data));
 
+            var expireTask = _redisCache.KeyExpireAsync(key, TimeSpan.FromSeconds(_options.Value.redis.expirationTime));
 
+            await Task.WhenAll(setTask, expireTask);
+        }
+
+        private async Task WriteDataToMemCache(string key,string data)
+        {
+            await _memCache.SetAsync(
+                key, Encoding.UTF8.GetBytes(data),
+                options: new DistributedCacheEntryOptions()
+                {
+                    AbsoluteExpirationRelativeToNow = TimeSpan.FromSeconds(_options.Value.inMemoryCache.expirationTime)
+                });
+        }
 
 
     }

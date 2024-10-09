@@ -20,12 +20,12 @@ namespace Book_Api
             builder.Services.AddControllers();
 
             builder.Services.AddHttpClient("Book-Client", httpclient => httpclient.BaseAddress = new Uri(builder.Configuration.GetSection("Book-Api:api-address").Value));
-            builder.Services.Configure<CacheConfig>(builder.Configuration.GetSection(nameof(CacheConfig)));
+            builder.Services.Configure<Book_Application.CacheConfig>(builder.Configuration.GetSection(nameof(Book_Application.CacheConfig)));
             Policy.Handle<RedisCommandException>()
                 .WaitAndRetry(5, x => TimeSpan.FromSeconds(15))
                 .Execute(() =>
                 {
-                    builder.Services.AddSingleton<IConnectionMultiplexer>(ConnectionMultiplexer.Connect("localhost:6379,abortConnect=false"));
+                    builder.Services.AddSingleton<IConnectionMultiplexer>(ConnectionMultiplexer.Connect("localhost:6379"));
                 }
                 );
             builder.Services.AddDistributedMemoryCache();
@@ -53,9 +53,9 @@ namespace Book_Api
 
             app.MapControllers();
             
-            app.UseMiddleware<StreamBuilderMiddleware>();
-            app.UseMiddleware<InMemoryCacheMiddleware>();
-            app.UseMiddleware<RedisMiddleware>();
+            //app.UseMiddleware<StreamBuilderMiddleware>();
+            //app.UseMiddleware<InMemoryCacheMiddleware>();
+            //app.UseMiddleware<RedisMiddleware>();
 
 
             app.Run();
