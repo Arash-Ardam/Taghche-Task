@@ -29,7 +29,7 @@ namespace Book_Application
 
 
 
-        public async Task<BookDto> GetBookFromApiAsync(short id)
+        public async Task<BookDto> GetBookAsync(short id)
         {
             try
             {
@@ -37,20 +37,15 @@ namespace Book_Application
 
                 if (cacheData == null)
                 {
-                    string route = $"{_httpclient.BaseAddress}/{id}";
-
-                    var response = await _httpclient.GetAsync(route);
-
-                    //var content = await response.Content.ReadAsStringAsync();
-                    var content = await response.Content.ReadFromJsonAsync<BookDto>();
+                    var response = await GetBookFromApiAsync(id);
 
                     string key = cacheKeyGenerator.GenerateKeyFromId(id);
 
-                    await WriteDataToMemCache(key, await response.Content.ReadAsStringAsync());
+                    await WriteDataToMemCache(key, response.ToString());
 
-                    await WriteDatatoRedisCache(key, await response.Content.ReadAsStringAsync());
+                    await WriteDatatoRedisCache(key, response.ToString());
 
-                    return content;
+                    return response;
                 }
 
                 return cacheData;
@@ -61,6 +56,17 @@ namespace Book_Application
 
                 throw;
             }
+        }
+
+        private async Task<BookDto?> GetBookFromApiAsync(short id) 
+        {
+            string route = $"{_httpclient.BaseAddress}/{id}";
+
+            var response = await _httpclient.GetAsync(route);
+
+            var content = await response.Content.ReadFromJsonAsync<BookDto>();
+
+            return content;
         }
 
         private BookDto? GetBookFromCache(short id)

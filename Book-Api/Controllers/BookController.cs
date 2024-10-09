@@ -20,7 +20,7 @@ namespace Book_Api.Controllers
         [HttpGet("{id}")]
         public async Task<ActionResult<BookDto>> GetBookAsync(short id)
         {
-            var response = await _service.GetBookFromApiAsync(id);
+            var response = await _service.GetBookAsync(id);
             if (response == null)
             {
                 return NotFound($"there is no book with this id : {id}");
