@@ -13,6 +13,7 @@ namespace Book_Application
     }
     public class redisConfig
     {
+        public string url { get; set; } = string.Empty;
         public int expirationTime { get; set; }
     }
     public class InMemoryCache

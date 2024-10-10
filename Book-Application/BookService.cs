@@ -33,17 +33,18 @@ namespace Book_Application
         {
             try
             {
-                var cacheData = GetBookFromCache(id);
+                var cacheData = await GetBookFromCache(id);
 
                 if (cacheData == null)
                 {
                     var response = await GetBookFromApiAsync(id);
 
                     string key = cacheKeyGenerator.GenerateKeyFromId(id);
+                    string data = JsonConvert.SerializeObject(response);
 
-                    await WriteDataToMemCache(key, response.ToString());
+                    await WriteDataToMemCache(key, data);
 
-                    await WriteDatatoRedisCache(key, response.ToString());
+                    await WriteDatatoRedisCache(key, data);
 
                     return response;
                 }
@@ -69,7 +70,7 @@ namespace Book_Application
             return content;
         }
 
-        private BookDto? GetBookFromCache(short id)
+        private async Task<BookDto?> GetBookFromCache(short id)
         {
             var key = cacheKeyGenerator.GenerateKeyFromId(id);
 
@@ -82,12 +83,13 @@ namespace Book_Application
 
             }
 
-            var redisCacheData = _redisCache.StringGetAsync(new RedisKey(key));
-            if (redisCacheData.Result.HasValue)
+            var redisCacheData = await _redisCache.StringGetAsync(new RedisKey(key));
+            if (redisCacheData.HasValue)
             {
-                var result = JsonConvert.DeserializeObject<BookDto>(Encoding.UTF8.GetString(redisCacheData.Result));
+                var t = redisCacheData;
+                var result = JsonConvert.DeserializeObject<BookDto>(redisCacheData.ToString());
 
-                WriteDataToMemCache(key, redisCacheData.Result);
+                WriteDataToMemCache(key, redisCacheData);
 
                 return result;
             }

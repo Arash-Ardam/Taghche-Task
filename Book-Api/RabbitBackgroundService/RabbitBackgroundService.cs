@@ -9,18 +9,21 @@ using Newtonsoft.Json;
 using Book_Infra;
 using Polly;
 using RabbitMQ.Client.Exceptions;
+using Microsoft.Extensions.Options;
 
 namespace Book_Api.RabbitBackgroundService
 {
     public class RabbitBackgroundService : BackgroundService
     {
         private Policy _policy;
+        private readonly RabbitConfig _rabbitConfigs;
         private ConnectionFactory _connFactory;
         private IDistributedCache _memCache;
         private IDatabase _redis;
         private IConnection _connection;
-        public RabbitBackgroundService(ConnectionFactory connectionFactory,IDistributedCache memoryCache,IConnectionMultiplexer muxer)
+        public RabbitBackgroundService(IOptions<RabbitConfig> rabbitConfigs,ConnectionFactory connectionFactory,IDistributedCache memoryCache,IConnectionMultiplexer muxer)
         {
+            _rabbitConfigs = rabbitConfigs.Value;
             _connFactory = connectionFactory;
             _memCache = memoryCache;
             _redis = muxer.GetDatabase();
@@ -29,8 +32,8 @@ namespace Book_Api.RabbitBackgroundService
         protected override Task ExecuteAsync(CancellationToken stoppingToken)
         {
             string result = string.Empty;
-            _connFactory.Uri = new Uri("amqp://guest:guest@localhost:5672");
-            _connFactory.ClientProvidedName = "Taghche-Rabbit-RecieverClient";
+            _connFactory.Uri = new Uri(_rabbitConfigs.Url);
+            _connFactory.ClientProvidedName = _rabbitConfigs.ClientProvidedName;
             _connFactory.AutomaticRecoveryEnabled = true;
 
 
@@ -41,9 +44,9 @@ namespace Book_Api.RabbitBackgroundService
                 });
 
 
-            string exchangeName = "Book-Exchange";
-            string routingKey = "book-modified";
-            string queue = "BookModified-Ack";
+            string exchangeName = _rabbitConfigs.ExchangeName;
+            string routingKey = _rabbitConfigs.RoutingKey;
+            string queue = _rabbitConfigs.Queue;
 
             IModel cannel = _connection.CreateModel();
             cannel.ExchangeDeclare(exchangeName, ExchangeType.Direct, durable: false, autoDelete: false);

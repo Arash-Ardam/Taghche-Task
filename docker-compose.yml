@@ -1,25 +1,28 @@
-version: "3.8"
+version: "3.4"
 
 services:
   book-api:
     image: ${DOCKER_REGISTRY-}bookapi
+    container_name: web-api
     build:
       context: .
       dockerfile: Book-Api/Dockerfile
     ports:
-        - "5000:5001"
-    depends_on:
-        - rabbitmq
-        - redis 
+        - "5000:5000"
+        - "5001:5001" 
+
    
   rabbitmq:
     image: rabbitmq:3-management
+    container_name: rabbit
     ports:
       - "5672:5672"  
       - "15672:15672"  
 
   redis:
     image: redis
+    container_name: redis
+    restart: always
     ports:
       - "6379:6379"  # Redis port
        

@@ -1,6 +1,7 @@
 
 using Book_Api.Controllers;
 using Book_Api.Middlewares;
+using Book_Api.RabbitBackgroundService;
 using Book_Application;
 using Book_Infra;
 using Polly;
@@ -21,11 +22,14 @@ namespace Book_Api
 
             builder.Services.AddHttpClient("Book-Client", httpclient => httpclient.BaseAddress = new Uri(builder.Configuration.GetSection("Book-Api:api-address").Value));
             builder.Services.Configure<Book_Application.CacheConfig>(builder.Configuration.GetSection(nameof(Book_Application.CacheConfig)));
+            builder.Services.Configure<RabbitConfig>(builder.Configuration.GetSection(nameof(RabbitConfig)));
+            var config = builder.Configuration.GetSection(nameof(Book_Application.CacheConfig));
+            var options = config.Get<Book_Application.CacheConfig>();
             Policy.Handle<RedisCommandException>()
                 .WaitAndRetry(5, x => TimeSpan.FromSeconds(15))
                 .Execute(() =>
                 {
-                    builder.Services.AddSingleton<IConnectionMultiplexer>(ConnectionMultiplexer.Connect("localhost:6379"));
+                    builder.Services.AddSingleton<IConnectionMultiplexer>(ConnectionMultiplexer.Connect(options.redis.url));
                 }
                 );
             builder.Services.AddDistributedMemoryCache();
@@ -33,6 +37,18 @@ namespace Book_Api
             builder.Services.AddScoped<BookService>();
             builder.Services.AddScoped<BookController>();
             builder.Services.AddHostedService<RabbitBackgroundService.RabbitBackgroundService>();
+
+            builder.Services.AddCors(options =>
+            {
+                options.AddPolicy(name: "taghche-Cors_Specs",
+                                  policy =>
+                                  {
+                                      policy.AllowAnyHeader();
+                                      policy.AllowAnyOrigin();
+                                      policy.AllowAnyMethod();
+
+                                  });
+            });
 
             builder.Services.AddEndpointsApiExplorer();
             builder.Services.AddSwaggerGen();
@@ -45,6 +61,8 @@ namespace Book_Api
                 app.UseSwagger();
                 app.UseSwaggerUI();
             }
+
+
             
             app.UseHttpsRedirection();
 
@@ -56,7 +74,6 @@ namespace Book_Api
             //app.UseMiddleware<StreamBuilderMiddleware>();
             //app.UseMiddleware<InMemoryCacheMiddleware>();
             //app.UseMiddleware<RedisMiddleware>();
-
 
             app.Run();
         }
